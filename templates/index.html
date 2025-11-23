@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SunbrosSMP - Server Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 2.5em;
+        }
+        .status {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .status-line:last-child {
+            margin-bottom: 0;
+        }
+        .label {
+            color: #666;
+            font-weight: 500;
+        }
+        .value {
+            color: #333;
+            font-weight: 600;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-indicator.online {
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+        }
+        .status-indicator.offline {
+            background: #ef4444;
+        }
+        .status-indicator.starting {
+            background: #f59e0b;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .start-btn {
+            background: #10b981;
+            color: white;
+        }
+        .start-btn:hover:not(:disabled) {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        .stop-btn {
+            background: #ef4444;
+            color: white;
+        }
+        .stop-btn:hover:not(:disabled) {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+        .logs {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        .logs::-webkit-scrollbar {
+            width: 8px;
+        }
+        .logs::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
+        .logs::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+        .log-line {
+            margin-bottom: 4px;
+        }
+        .log-info { color: #4fc3f7; }
+        .log-warning { color: #ffb74d; }
+        .log-error { color: #ef5350; }
+        .log-success { color: #66bb6a; }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>☀️ SunbrosSMP</h1>
+        
+        <div class="status">
+            <div class="status-line">
+                <span class="label">Droplet Status:</span>
+                <span class="value">
+                    <span class="status-indicator" id="status-indicator"></span>
+                    <span id="droplet-status">Loading...</span>
+                </span>
+            </div>
+            <div class="status-line">
+                <span class="label">Players Online:</span>
+                <span class="value" id="player-count">-</span>
+            </div>
+            <div class="status-line">
+                <span class="label">Server IP:</span>
+                <span class="value" id="server-ip">-</span>
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button class="start-btn" id="start-btn" onclick="startServer()">▶ Start Server</button>
+            <button class="stop-btn" id="stop-btn" onclick="stopServer()">⏹ Stop Server</button>
+        </div>
+
+        <div class="logs" id="logs">
+            <div class="log-line log-info">Connecting to server...</div>
+        </div>
+
+        <div class="footer">
+            Auto-start enabled | 15 min auto-shutdown
+        </div>
+    </div>
+
+    <script>
+        let logsData = [];
+        const maxLogs = 50;
+
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            logsData.push({ timestamp, message, type });
+            if (logsData.length > maxLogs) logsData.shift();
+            updateLogsDisplay();
+        }
+
+        function updateLogsDisplay() {
+            const logsDiv = document.getElementById('logs');
+            logsDiv.innerHTML = logsData.map(log => 
+                `<div class="log-line log-${log.type}">[${log.timestamp}] ${log.message}</div>`
+            ).join('');
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                const statusIndicator = document.getElementById('status-indicator');
+                const statusText = document.getElementById('droplet-status');
+                const playerCount = document.getElementById('player-count');
+                const serverIp = document.getElementById('server-ip');
+                const startBtn = document.getElementById('start-btn');
+                const stopBtn = document.getElementById('stop-btn');
+
+                // Update status
+                statusText.textContent = data.status;
+                statusIndicator.className = 'status-indicator';
+                
+                if (data.status === 'active') {
+                    statusIndicator.classList.add('online');
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                } else if (data.status === 'off') {
+                    statusIndicator.classList.add('offline');
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                } else {
+                    statusIndicator.classList.add('starting');
+                    startBtn.disabled = true;
+                    stopBtn.disabled = true;
+                }
+
+                // Update player count
+                playerCount.textContent = data.player_count !== null ? data.player_count : '-';
+                
+                // Update server IP
+                serverIp.textContent = data.server_ip || '-';
+
+            } catch (error) {
+                addLog('Error fetching status: ' + error.message, 'error');
+            }
+        }
+
+        async function fetchLogs() {
+            try {
+                const response = await fetch('/api/logs');
+                const data = await response.json();
+                
+                if (data.logs && data.logs.length > 0) {
+                    logsData = data.logs.slice(-maxLogs);
+                    updateLogsDisplay();
+                }
+            } catch (error) {
+                console.error('Error fetching logs:', error);
+            }
+        }
+
+        async function startServer() {
+            addLog('Sending start command...', 'info');
+            try {
+                const response = await fetch('/api/start', { method: 'POST' });
+                const data = await response.json();
+                addLog(data.message, data.success ? 'success' : 'error');
+                fetchStatus();
+            } catch (error) {
+                addLog('Error starting server: ' + error.message, 'error');
+            }
+        }
+
+        async function stopServer() {
+            addLog('Sending stop command...', 'info');
+            try {
+                const response = await fetch('/api/stop', { method: 'POST' });
+                const data = await response.json();
+                addLog(data.message, data.success ? 'success' : 'error');
+                fetchStatus();
+            } catch (error) {
+                addLog('Error stopping server: ' + error.message, 'error');
+            }
+        }
+
+        // Initial load
+        fetchStatus();
+        fetchLogs();
+
+        // Auto-refresh every 5 seconds
+        setInterval(fetchStatus, 5000);
+        setInterval(fetchLogs, 3000);
+    </script>
+</body>
+</html>

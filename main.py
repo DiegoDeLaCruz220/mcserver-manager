@@ -2,12 +2,14 @@ import os
 import sys
 import time
 import logging
+import threading
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 from digitalocean_manager import DigitalOceanManager
 from minecraft_monitor import MinecraftMonitor
 from port_listener import TCPProxy
+from web_server import init_web_server, run_web_server
 
 # Setup logging
 logging.basicConfig(
@@ -179,6 +181,13 @@ class MCServerManager:
         logger.info(f"Proxying connections to: {self.mc_server_ip}:{self.listen_port}")
         logger.info(f"Listening on port: {self.listen_port}")
         logger.info(f"Inactivity timeout: {self.inactivity_timeout} minutes")
+        
+        # Initialize and start web server in background thread
+        init_web_server(self)
+        web_port = int(os.getenv('WEB_PORT', 8080))
+        web_thread = threading.Thread(target=run_web_server, args=(web_port,), daemon=True)
+        web_thread.start()
+        logger.info(f"Web dashboard started on port {web_port}")
         
         # Start the TCP proxy
         self.tcp_proxy.start()

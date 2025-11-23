@@ -31,7 +31,8 @@ class MCServerManager:
         self.do_api_token = os.getenv('DO_API_TOKEN')
         self.droplet_id = os.getenv('DROPLET_ID')
         self.mc_server_ip = os.getenv('MC_SERVER_IP')
-        self.listen_port = int(os.getenv('LISTEN_PORT', 25565))
+        # Railway assigns PORT, but we also support LISTEN_PORT for flexibility
+        self.listen_port = int(os.getenv('PORT', os.getenv('LISTEN_PORT', 25565)))
         self.inactivity_timeout = int(os.getenv('INACTIVITY_TIMEOUT', 15))
         
         # Validate required config

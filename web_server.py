@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify
 import logging
+import os
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,8 @@ def get_status():
             return jsonify({
                 'status': 'unknown',
                 'player_count': None,
-                'server_ip': None
+                'server_ip': None,
+                'crafty_url': None
             })
         
         # Get droplet status
@@ -77,19 +79,26 @@ def get_status():
         if is_running and manager_instance.server_ready:
             player_count = manager_instance.mc_monitor.get_player_count()
         
+        # Get CraftyController URL from env or default
+        crafty_url = os.getenv('CRAFTY_URL')
+        if not crafty_url and is_running:
+            crafty_url = f"http://{manager_instance.mc_server_ip}:8443"
+        
         return jsonify({
             'status': status,
             'player_count': player_count,
             'server_ip': manager_instance.mc_server_ip,
             'tcp_proxy_port': manager_instance.listen_port,
-            'active_connections': manager_instance.tcp_proxy.get_active_connections()
+            'active_connections': manager_instance.tcp_proxy.get_active_connections(),
+            'crafty_url': crafty_url if is_running else None
         })
     except Exception as e:
         logger.error(f"Error getting status: {e}")
         return jsonify({
             'status': 'error',
             'player_count': None,
-            'server_ip': None
+            'server_ip': None,
+            'crafty_url': None
         }), 500
 
 

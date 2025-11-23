@@ -171,6 +171,14 @@
                 <span class="label">Server IP:</span>
                 <span class="value" id="server-ip">-</span>
             </div>
+            <div class="status-line">
+                <span class="label">Management:</span>
+                <span class="value">
+                    <a href="#" id="crafty-link" style="color: #667eea; text-decoration: none; pointer-events: none; opacity: 0.5;">
+                        Open CraftyController
+                    </a>
+                </span>
+            </div>
         </div>
 
         <div class="buttons">
@@ -217,6 +225,7 @@
                 const serverIp = document.getElementById('server-ip');
                 const startBtn = document.getElementById('start-btn');
                 const stopBtn = document.getElementById('stop-btn');
+                const craftyLink = document.getElementById('crafty-link');
 
                 // Update status
                 statusText.textContent = data.status;
@@ -226,14 +235,33 @@
                     statusIndicator.classList.add('online');
                     startBtn.disabled = true;
                     stopBtn.disabled = false;
+                    
+                    // Enable CraftyController link
+                    const craftyUrl = data.crafty_url || `http://${data.server_ip}:8443`;
+                    craftyLink.href = craftyUrl;
+                    craftyLink.style.pointerEvents = 'auto';
+                    craftyLink.style.opacity = '1';
+                    craftyLink.style.fontWeight = '600';
                 } else if (data.status === 'off') {
                     statusIndicator.classList.add('offline');
                     startBtn.disabled = false;
                     stopBtn.disabled = true;
+                    
+                    // Disable CraftyController link
+                    craftyLink.href = '#';
+                    craftyLink.style.pointerEvents = 'none';
+                    craftyLink.style.opacity = '0.5';
+                    craftyLink.style.fontWeight = 'normal';
                 } else {
                     statusIndicator.classList.add('starting');
                     startBtn.disabled = true;
                     stopBtn.disabled = true;
+                    
+                    // Disable CraftyController link while starting
+                    craftyLink.href = '#';
+                    craftyLink.style.pointerEvents = 'none';
+                    craftyLink.style.opacity = '0.5';
+                    craftyLink.style.fontWeight = 'normal';
                 }
 
                 // Update player count

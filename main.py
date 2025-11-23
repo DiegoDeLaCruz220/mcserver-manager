@@ -184,7 +184,8 @@ class MCServerManager:
         
         # Initialize and start web server in background thread
         init_web_server(self)
-        web_port = int(os.getenv('WEB_PORT', 8080))
+        # Use PORT env var for web server (Railway assigns this)
+        web_port = int(os.getenv('PORT', 8080))
         web_thread = threading.Thread(target=run_web_server, args=(web_port,), daemon=True)
         web_thread.start()
         logger.info(f"Web dashboard started on port {web_port}")

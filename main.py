@@ -33,17 +33,29 @@ class MCServerManager:
         self.do_api_token = os.getenv('DO_API_TOKEN')
         self.droplet_id = os.getenv('DROPLET_ID')
         self.mc_server_ip = os.getenv('MC_SERVER_IP')
-        # Prioritize LISTEN_PORT over Railway's auto-assigned PORT
-        self.listen_port = int(os.getenv('LISTEN_PORT') if os.getenv('LISTEN_PORT') else os.getenv('PORT', 25565))
+        # LISTEN_PORT is for Minecraft TCP proxy (always 25565)
+        self.listen_port = int(os.getenv('LISTEN_PORT', 25565))
+        # PORT is for the web dashboard (Railway assigns this for HTTP)
+        self.web_port = int(os.getenv('PORT', 8080))
         self.inactivity_timeout = int(os.getenv('INACTIVITY_TIMEOUT', 15))
         
         # Validate required config
         if not all([self.do_api_token, self.droplet_id, self.mc_server_ip]):
             logger.error("Missing required environment variables. Check your .env file.")
-            sys.exit(1)
+            logger.error(f"DO_API_TOKEN: {'set' if self.do_api_token else 'MISSING'}")
+            logger.error(f"DROPLET_ID: {'set' if self.droplet_id else 'MISSING'}")
+            logger.error(f"MC_SERVER_IP: {'set' if self.mc_server_ip else 'MISSING'}")
+            # Don't exit, just log and continue for web dashboard
+            logger.warning("Running in limited mode - web dashboard only")
         
         # Initialize managers
-        self.do_manager = DigitalOceanManager(self.do_api_token, self.droplet_id)
+        try:
+            self.do_manager = DigitalOceanManager(self.do_api_token, self.droplet_id)
+        except Exception as e:
+            logger.error(f"Failed to initialize Digital Ocean manager: {e}")
+            logger.warning("Digital Ocean features will be unavailable")
+            self.do_manager = None
+        
         self.mc_monitor = MinecraftMonitor(self.mc_server_ip, self.listen_port)
         self.tcp_proxy = TCPProxy(
             listen_port=self.listen_port,
@@ -184,11 +196,9 @@ class MCServerManager:
         
         # Initialize and start web server in background thread
         init_web_server(self)
-        # Use PORT env var for web server (Railway assigns this)
-        web_port = int(os.getenv('PORT', 8080))
-        web_thread = threading.Thread(target=run_web_server, args=(web_port,), daemon=True)
+        web_thread = threading.Thread(target=run_web_server, args=(self.web_port,), daemon=True)
         web_thread.start()
-        logger.info(f"Web dashboard started on port {web_port}")
+        logger.info(f"Web dashboard started on port {self.web_port}")
         
         # Start the TCP proxy
         self.tcp_proxy.start()
